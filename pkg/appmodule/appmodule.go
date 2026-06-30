@@ -13,10 +13,6 @@ type Named interface {
 	Name() string
 }
 
-type SchemaApplier interface {
-	ApplySchema(context.Context, *bun.DB) error
-}
-
 type Registrar interface {
 	Register(huma.API)
 }
@@ -33,10 +29,10 @@ type Closer interface {
 type BuildFunc func(*Context) (Module, error)
 
 type Spec struct {
-	Name        string
-	Requires    []string
-	ApplySchema func(context.Context, *bun.DB) error
-	Build       BuildFunc
+	Name     string
+	Requires []string
+	Schema   func(context.Context, *bun.DB) error
+	Build    BuildFunc
 }
 
 type Context struct {
@@ -180,10 +176,10 @@ func MustContextGet[T Module](c *Context, name string) T {
 }
 
 func applySchema(ctx context.Context, db *bun.DB, spec Spec) error {
-	if spec.ApplySchema == nil {
+	if spec.Schema == nil {
 		return fmt.Errorf("module %s schema func is nil", spec.Name)
 	}
-	if err := spec.ApplySchema(ctx, db); err != nil {
+	if err := spec.Schema(ctx, db); err != nil {
 		return fmt.Errorf("apply %s schema: %w", spec.Name, err)
 	}
 	return nil

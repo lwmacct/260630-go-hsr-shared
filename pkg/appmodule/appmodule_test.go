@@ -55,7 +55,7 @@ func TestBuildRejectsDependencyCycle(t *testing.T) {
 func TestBuildWrapsSchemaError(t *testing.T) {
 	_, err := appmodule.Build(context.Background(), nil, appmodule.Spec{
 		Name: "auth",
-		ApplySchema: func(context.Context, *bun.DB) error {
+		Schema: func(context.Context, *bun.DB) error {
 			return errors.New("boom")
 		},
 		Build: func(*appmodule.Context) (appmodule.Module, error) {
@@ -69,8 +69,8 @@ func TestBuildWrapsSchemaError(t *testing.T) {
 
 func TestBuildWrapsBuildError(t *testing.T) {
 	_, err := appmodule.Build(context.Background(), nil, appmodule.Spec{
-		Name:        "auth",
-		ApplySchema: func(context.Context, *bun.DB) error { return nil },
+		Name:   "auth",
+		Schema: func(context.Context, *bun.DB) error { return nil },
 		Build: func(*appmodule.Context) (appmodule.Module, error) {
 			return nil, errors.New("boom")
 		},
@@ -84,16 +84,16 @@ func TestBuildClosesInitializedModulesOnFailure(t *testing.T) {
 	var closed []string
 	_, err := appmodule.Build(context.Background(), nil,
 		appmodule.Spec{
-			Name:        "auth",
-			ApplySchema: func(context.Context, *bun.DB) error { return nil },
+			Name:   "auth",
+			Schema: func(context.Context, *bun.DB) error { return nil },
 			Build: func(*appmodule.Context) (appmodule.Module, error) {
 				return closeModule{name: "auth", closed: &closed}, nil
 			},
 		},
 		appmodule.Spec{
-			Name:        "oauth",
-			Requires:    []string{"auth"},
-			ApplySchema: func(context.Context, *bun.DB) error { return errors.New("boom") },
+			Name:     "oauth",
+			Requires: []string{"auth"},
+			Schema:   func(context.Context, *bun.DB) error { return errors.New("boom") },
 			Build: func(*appmodule.Context) (appmodule.Module, error) {
 				return testModule{name: "oauth"}, nil
 			},
@@ -122,7 +122,7 @@ func spec(name string, requires []string, calls *[]string) appmodule.Spec {
 	return appmodule.Spec{
 		Name:     name,
 		Requires: requires,
-		ApplySchema: func(context.Context, *bun.DB) error {
+		Schema: func(context.Context, *bun.DB) error {
 			if calls != nil {
 				*calls = append(*calls, "schema:"+name)
 			}
