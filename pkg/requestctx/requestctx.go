@@ -10,6 +10,7 @@ import (
 
 type Request struct {
 	IP         string
+	Scheme     string
 	Host       string
 	UserAgent  string
 	Method     string
@@ -53,12 +54,30 @@ func (m Middleware) Request(r *http.Request) (Request, bool) {
 	}
 	return Request{
 		IP:         ip.String(),
+		Scheme:     m.Scheme(r),
 		Host:       r.Host,
 		UserAgent:  r.UserAgent(),
 		Method:     r.Method,
 		Path:       r.URL.Path,
 		RemoteAddr: r.RemoteAddr,
 	}, true
+}
+
+func (m Middleware) Scheme(r *http.Request) string {
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	if !m.trustedRemote(r) {
+		return scheme
+	}
+	if proto, ok := ParseForwardedProto(r.Header.Get("X-Forwarded-Proto")); ok {
+		return proto
+	}
+	if proto, ok := ParseForwardedProto(r.Header.Get("X-Forwarded-Scheme")); ok {
+		return proto
+	}
+	return scheme
 }
 
 func (m Middleware) ClientIP(r *http.Request) (netip.Addr, bool) {
@@ -80,6 +99,18 @@ func (m Middleware) ClientIP(r *http.Request) (netip.Addr, bool) {
 		return ip, true
 	}
 	return remoteIP, true
+}
+
+func (m Middleware) trustedRemote(r *http.Request) bool {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+	remoteIP, ok := ParseIP(host)
+	if !ok {
+		return false
+	}
+	return len(m.trustedProxies) > 0 && IPInPrefixes(remoteIP, m.trustedProxies)
 }
 
 func ParseTrustedProxies(values []string) []netip.Prefix {
@@ -116,6 +147,17 @@ func ParseXForwardedFor(value string) (netip.Addr, bool) {
 		}
 	}
 	return netip.Addr{}, false
+}
+
+func ParseForwardedProto(value string) (string, bool) {
+	for _, part := range strings.Split(value, ",") {
+		proto := strings.ToLower(strings.TrimSpace(strings.Trim(part, `"`)))
+		switch proto {
+		case "http", "https":
+			return proto, true
+		}
+	}
+	return "", false
 }
 
 func ParseIP(value string) (netip.Addr, bool) {
