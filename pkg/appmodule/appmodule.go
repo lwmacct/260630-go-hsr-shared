@@ -33,7 +33,7 @@ type Module interface {
 	Registrar
 }
 
-func ApplySchemas(ctx context.Context, db *bun.DB, modules ...SchemaApplier) error {
+func ApplySchemas(ctx context.Context, db *bun.DB, modules ...Module) error {
 	for _, module := range modules {
 		if err := module.ApplySchema(ctx, db); err != nil {
 			return fmt.Errorf("apply %s schema: %w", module.Name(), err)
@@ -42,7 +42,7 @@ func ApplySchemas(ctx context.Context, db *bun.DB, modules ...SchemaApplier) err
 	return nil
 }
 
-func Init(ctx context.Context, db *bun.DB, modules ...Initializer) error {
+func Init(ctx context.Context, db *bun.DB, modules ...Module) error {
 	for _, module := range modules {
 		if err := module.Init(ctx, db); err != nil {
 			return fmt.Errorf("configure %s module: %w", module.Name(), err)
@@ -51,7 +51,7 @@ func Init(ctx context.Context, db *bun.DB, modules ...Initializer) error {
 	return nil
 }
 
-func Register(api huma.API, modules ...Registrar) {
+func Register(api huma.API, modules ...Module) {
 	for _, module := range modules {
 		module.Register(api)
 	}
